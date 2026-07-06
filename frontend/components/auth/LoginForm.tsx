@@ -7,7 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import axios from "axios";
 
-import { login } from "@/services/auth.api";
+
+import { useAuth } from "@/context/AuthContext";
 import {
   loginSchema,
   LoginFormData,
@@ -25,6 +26,7 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginForm() {
   const router = useRouter();
+  const { login } = useAuth();
   const {
     register,
     handleSubmit,
@@ -35,12 +37,12 @@ export default function LoginForm() {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      await login({
+      const user = await login({
         email: data.email,
         password: data.password,
       });
       toast.success("Logged in successfully");
-      router.push("/");
+      router.push(user.role === "admin" ? "/role/admin" : "/role/user");
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.data?.message) {
         toast.error(error.response.data.message);
@@ -99,7 +101,7 @@ export default function LoginForm() {
 
           <p className="text-center text-sm mt-4">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-blue-600 hover:underline">
+            <Link href="/auth/register" className="text-blue-600 hover:underline">
               Register
             </Link>
           </p>

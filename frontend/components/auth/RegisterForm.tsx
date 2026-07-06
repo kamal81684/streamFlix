@@ -41,7 +41,7 @@ export default function RegisterForm() {
         password: data.password,
       });
       toast.success("Account created successfully");
-      router.push("/login");
+      router.push("/auth/login");
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.data?.message) {
         toast.error(error.response.data.message);
@@ -129,7 +129,7 @@ export default function RegisterForm() {
 
           <p className="text-center text-sm mt-4">
             Already have an account?{" "}
-            <Link href="/login" className="text-blue-600 hover:underline">
+            <Link href="/auth/login" className="text-blue-600 hover:underline">
               Login
             </Link>
           </p>

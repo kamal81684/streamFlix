@@ -23,3 +23,8 @@ export const refreshToken = async () => {
 export const getProfile = async () => {
     return await api.get("/users/profile");
 };
+
+export const updateProfile = async (data: { name: string; email: string }) =>
+    api.put("/users/profile", data);
+export const changePassword = async (data: { currentPassword: string; newPassword: string }) =>
+    api.put("/users/change-password", data);
