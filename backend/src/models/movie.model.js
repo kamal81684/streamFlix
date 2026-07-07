@@ -98,6 +98,14 @@ const movieSchema = new mongoose.Schema({
         lowercase: true,
         trim: true,
     },
+
+    video: {
+        key: String,
+        url: String,
+        duration: { type: Number, default: 0},
+        size: { type: Number, default: 0 },
+        mimeType: String,
+    },
     
 },
     {timestamps: true,}

@@ -13,14 +13,21 @@ import {
     featureMovie,
     unfeatureMovie,
     getFeaturedMovie,
+    getLatestMovies,
+    getGenres,
+    getSimilarMovies,
+    uploadMovieVideo,
+    streamMovie,
+    updateWatchProgress,
+    getContinueWatching,
 } from "../controllers/movie.controller.js";
 
 import { createMovieValidation } from "../validators/movie.validator.js";
 
-import validate from "../middleware/validate.middleware.js";
-
 import { authenticate, authorize } from "../middleware/auth.middleware.js";
-import { uploadThumbnail } from "../middleware/upload.middleware.js";
+import { uploadThumbnail, uploadVideo } from "../middleware/upload.middleware.js";
+import { updateProgressValidator } from "../validators/watchHistory.validator.js";
+import validate from "../middleware/validate.middleware.js";
 
 // Public routes (must be before /:id)
 router.get(
@@ -98,4 +105,45 @@ router.get(
     getFeaturedMovie
 );
 
+router.get(
+    "/latest",
+    getLatestMovies
+);
+
+router.get(
+    "/genres",
+    getGenres
+);
+
+router.get(
+    "/:id/similar",
+    getSimilarMovies
+);
+
+router.patch(
+    "/:id/video",
+    authenticate,
+    authorize("admin"),
+    uploadVideo.single("video"),
+    uploadMovieVideo
+);
+
+router.get(
+    "/:id/video",
+    streamMovie
+);
+
+router.post(
+    "/progress",
+    authenticate,
+    updateProgressValidator,
+    validate,
+    updateWatchProgress
+);
+
+router.get(
+    "/continue",
+    authenticate,
+    getContinueWatching
+);
 export default router;

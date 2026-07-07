@@ -1,5 +1,7 @@
 import Movie from "../models/movie.model.js";
+import WatchHistory from "../models/watchHistory.model.js";
 import ApiError from "../errors/Apierror.js";
+import { uploadToS3Stream, getVideosStream, deleteFromS3 } from "../utils/s3.js";
 
 export const createMovieService = async (
     movieData
@@ -186,4 +188,158 @@ export const getFeaturedMovieService = async () => {
     }).lean();
 
     return movie;
+};
+
+export const getLatestMoviesService = async () => {
+
+    const movies = await Movie.find({
+        isPublished: true,
+    })
+        .sort({
+            releaseYear: -1,
+            createdAt: -1,
+        })
+        .limit(10)
+        .lean();
+
+    return movies;
+};
+
+export const getSimilarMoviesService = async (movieId) => {
+
+    const movie = await Movie.findById(movieId);
+
+    if (!movie) {
+        throw new ApiError(
+            404,
+            "Movie not found"
+        );
+    }
+
+    const similarMovies = await Movie.find({
+
+        _id: {
+            $ne: movie._id,
+        },
+
+        isPublished: true,
+
+        genre: {
+            $in: movie.genre,
+        },
+
+    })
+        .limit(10)
+        .lean();
+
+    return similarMovies;
+};
+
+export const getGenresService = async () => {
+
+    const genres = await Movie.distinct(
+        "genre",
+        {
+            isPublished: true,
+        }
+    );
+
+    return genres.sort();
+
+};
+
+export const uploadMovieVideoService = async (
+    movieId,
+    file
+) => {
+    const movie = await Movie.findById(movieId);
+
+    if (!movie) {
+        throw new ApiError(404, "Movie not found");
+    }
+
+    const oldVideo = movie.video;
+
+    const uploaded = await uploadToS3Stream(
+        file.path,
+        file.originalname,
+        file.mimetype,
+        "videos"
+    );
+
+    movie.video = {
+        key: uploaded.key,
+        url: uploaded.url,
+        size: file.size,
+        mimeType: file.mimetype,
+        duration: 0,
+    };
+    await movie.save();
+
+    if (oldVideo?.key) {
+
+        try {
+
+            await deleteFromS3(oldVideo.key);
+
+        } catch (error) {
+
+            console.error(
+                "Failed to delete old video:",
+                error
+            );
+
+        }
+
+    }
+
+    return movie;
+}
+
+export const streamMovieService = async (
+    movieId,
+    range
+) => {
+    const movie = await Movie.findById(movieId);
+
+    if (!movie) {
+        throw new ApiError(
+            404,
+            "Movie not found"
+        );
+    }
+
+    if (!movie.video?.key) {
+        throw new ApiError(
+            404,
+            "Video not uploaded"
+        );
+    }
+
+    const streamData =
+        await getVideosStream(
+            movie.video.key,
+            range
+        );
+
+    return streamData;
+
+};
+
+export const getContinueWatchingService = async (userId) => {
+
+    return await WatchHistory.find({
+        user: userId,
+        completed: false,
+        progress: { $gt: 0 },
+    })
+        .populate({
+            path: "movie",
+        })
+        .sort({
+            watchedAt: -1,
+        })
+        .limit(10)
+        .lean();
+
 };

@@ -237,3 +237,188 @@ export const getFeaturedMovie = async (req, res, next) => {
     }
 };
 
+export const getLatestMovies = async (
+    req,
+    res,
+    next
+) => {
+
+    try {
+
+        const movies =
+            await getLatestMoviesService();
+
+        return res.status(200).json({
+            success: true,
+            movies,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+
+};
+
+export const getGenres = async (
+    req,
+    res,
+    next
+) => {
+    try {
+
+        const genres =
+            await getGenresService();
+
+        return res.status(200).json({
+            success: true,
+            genres,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getSimilarMovies = async (
+    req,
+    res,
+    next
+) => {
+
+    try {
+
+        const movies =
+            await getSimilarMoviesService(
+                req.params.id
+            );
+
+        return res.status(200).json({
+            success: true,
+            movies,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+
+};
+
+export const uploadMovieVideo = async (
+    req,
+    res,
+    next
+) => {
+
+    try {
+
+        if (!req.file) {
+            throw new ApiError(
+                400,
+                "Video is required"
+            );
+        }
+
+        const movie =
+            await uploadMovieVideoService(
+                req.params.id,
+                req.file
+            );
+
+        return res.status(200).json({
+            success: true,
+            message:
+                "Video uploaded successfully",
+            movie,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+
+};
+
+export const streamMovie = async (
+    req,
+    res,
+    next
+) => {
+
+    try {
+
+        const range =
+            req.headers.range;
+
+        if (!range) {
+            throw new ApiError(
+                400,
+                "Range header is required."
+            );
+        }
+
+        const video =
+            await streamMovieService(
+                req.params.id,
+                range
+            );
+
+        res.writeHead(206, {
+
+            "Content-Range":
+`bytes ${video.start}-${video.end}/${video.fileSize}`,
+
+            "Accept-Ranges":
+"bytes",
+
+            "Content-Length":
+video.end -
+video.start +
+1,
+
+            "Content-Type":
+video.contentType,
+
+        });
+
+        video.stream.pipe(res);
+
+    } catch(error) {
+
+        next(error);
+
+    }
+
+};
+
+export const updateWatchProgress = async (
+    req,
+    res,
+    next
+) => {
+
+};
+
+export const getContinueWatching = async (
+    req,
+    res,
+    next
+) => {
+
+    try {
+
+        const movies =
+            await getContinueWatchingService(
+                req.user._id
+            );
+
+        return res.status(200).json({
+            success: true,
+            movies,
+        });
+
+    } catch(error) {
+
+        next(error);
+
+    }
+
+};
