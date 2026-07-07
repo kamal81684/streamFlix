@@ -1,6 +1,7 @@
 import User from "../models/user.model.js";
 import bcrypt from "bcrypt";
 import ApiError from "../errors/Apierror.js";
+import { uploadToS3 } from "../utils/s3.js";
 
 export const getProfile = async (req, res) => {
 
@@ -57,10 +58,10 @@ export const changePassword = async (req, res, next) => {
 export const uploadAvatar = async (req, res, next) => {
     try {
         if(!req.file) throw new ApiError(400, "No file uploaded");
-        const avatar = `/uploads/avatars/${req.file.filename}`;
+        const { url } = await uploadToS3(req.file, "avatars");
         const user = await User.findByIdAndUpdate(
             req.user._id,
-            {avatar},
+            {avatar: url},
             {new: true}
         ).select("-password");
         res.status(200).json({
