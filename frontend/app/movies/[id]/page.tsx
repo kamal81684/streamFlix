@@ -7,6 +7,7 @@ import { Movie } from "@/types/movie.types";
 import { Button } from "@/components/ui/button";
 import MovieRow from "@/components/movie/MovieRow";
 import { useSimilarMovies } from "@/hooks/movie/useMovies";
+import CachedImage from "@/components/ui/CachedImage";
 
 export default function MovieDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -55,7 +56,8 @@ export default function MovieDetailPage() {
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
         {movie.thumbnail?.url ? (
-          <img
+          <CachedImage
+            cacheKey={movie.thumbnail.key}
             src={movie.thumbnail.url}
             alt={movie.title}
             className="aspect-video w-full object-cover"

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Movie } from "@/types/movie.types";
+import CachedImage from "@/components/ui/CachedImage";
 
 interface MovieCardProps {
   movie: Movie;
@@ -13,7 +14,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
     >
       <div className="aspect-video overflow-hidden bg-muted">
         {movie.thumbnail?.url ? (
-          <img
+          <CachedImage
+            cacheKey={movie.thumbnail.key}
             src={movie.thumbnail.url}
             alt={movie.title}
             className="h-full w-full object-cover transition-transform group-hover:scale-105"

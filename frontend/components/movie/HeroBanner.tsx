@@ -4,6 +4,7 @@
 import { useRouter } from "next/navigation";
 import { useFeaturedMovie } from "@/hooks/movie/useFeaturedMovie";
 import { Button } from "@/components/ui/button";
+import CachedImage from "@/components/ui/CachedImage";
 
 export default function HeroBanner() {
   const { data: movie, isLoading } = useFeaturedMovie();
@@ -22,7 +23,8 @@ export default function HeroBanner() {
   return (
     <section className="relative flex h-[50vh] items-end overflow-hidden">
       {movie.thumbnail?.url ? (
-        <img
+        <CachedImage
+          cacheKey={movie.thumbnail.key}
           src={movie.thumbnail.url}
           alt={movie.title}
           className="absolute inset-0 h-full w-full object-cover"

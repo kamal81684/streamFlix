@@ -14,6 +14,7 @@ import {
 import { uploadThumbnailDirect, uploadVideoDirect } from "@/lib/upload";
 import { Movie } from "@/types/movie.types";
 import { Button } from "@/components/ui/button";
+import CachedImage from "@/components/ui/CachedImage";
 
 // A clickable preview tile that doubles as the upload / replace control.
 function MediaCell({
@@ -251,8 +252,8 @@ export default function MovieTable() {
                   progress={progress[`${movie._id}:thumb`]}
                   onFile={(file) => handleThumbnailUpload(movie._id, file)}
                   preview={
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <CachedImage
+                      cacheKey={movie.thumbnail?.key}
                       src={movie.thumbnail?.url}
                       alt={movie.title}
                       className="h-full w-full object-cover"
