@@ -25,6 +25,7 @@ import {
     initiateVideoUpload,
     completeVideoUpload,
     abortVideoUpload,
+    getMovieProgress,
 } from "../controllers/movie.controller.js";
 
 import { createMovieValidation } from "../validators/movie.validator.js";
@@ -173,6 +174,12 @@ router.patch(
 router.get(
     "/:id/similar",
     getSimilarMovies
+);
+
+router.get(
+    "/:id/progress",
+    authenticate,
+    getMovieProgress
 );
 
 router.patch(

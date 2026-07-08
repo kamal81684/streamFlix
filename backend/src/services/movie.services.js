@@ -374,3 +374,45 @@ export const getContinueWatchingService = async (userId) => {
         .lean();
 
 };
+
+export const updateWatchProgressService = async (
+    userId,
+    { movieId, lastPosition, duration, progress, completed }
+) => {
+
+    // A movie counts as "watched" once past 95% — stops it from lingering
+    // in Continue Watching forever and re-shows it as fresh next time.
+    const derivedProgress =
+        typeof progress === "number"
+            ? progress
+            : duration > 0
+                ? Math.min(100, Math.round((lastPosition / duration) * 100))
+                : 0;
+
+    const isCompleted =
+        typeof completed === "boolean" ? completed : derivedProgress >= 95;
+
+    return await WatchHistory.findOneAndUpdate(
+        { user: userId, movie: movieId },
+        {
+            user: userId,
+            movie: movieId,
+            lastPosition,
+            duration,
+            progress: derivedProgress,
+            completed: isCompleted,
+            watchedAt: Date.now(),
+        },
+        { new: true, upsert: true }
+    );
+
+};
+
+export const getMovieProgressService = async (userId, movieId) => {
+
+    return await WatchHistory.findOne({
+        user: userId,
+        movie: movieId,
+    }).lean();
+
+};

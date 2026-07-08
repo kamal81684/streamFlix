@@ -16,6 +16,8 @@ import {
     setMovieVideoService,
     streamMovieService,
     getContinueWatchingService,
+    updateWatchProgressService,
+    getMovieProgressService,
 } from "../services/movie.services.js";
 
 import ApiError from "../errors/Apierror.js";
@@ -548,6 +550,46 @@ export const updateWatchProgress = async (
     res,
     next
 ) => {
+
+    try {
+
+        const history = await updateWatchProgressService(
+            req.user._id,
+            req.body
+        );
+
+        return res.status(200).json({
+            success: true,
+            history,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+
+};
+
+export const getMovieProgress = async (
+    req,
+    res,
+    next
+) => {
+
+    try {
+
+        const history = await getMovieProgressService(
+            req.user._id,
+            req.params.id
+        );
+
+        return res.status(200).json({
+            success: true,
+            history: history || null,
+        });
+
+    } catch (error) {
+        next(error);
+    }
 
 };
 

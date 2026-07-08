@@ -2,6 +2,7 @@
 
 import HeroBanner from "@/components/movie/HeroBanner";
 import MovieRow from "@/components/movie/MovieRow";
+import ContinueWatchingRow from "@/components/movie/ContinueWatchingRow";
 import { useLatestMovies } from "@/hooks/movie/useMovies";
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
     <div>
       <HeroBanner />
       <div className="mx-auto max-w-7xl space-y-10 px-4 py-10">
+        <ContinueWatchingRow />
         <MovieRow
           title="Latest Movies"
           movies={latestMovies}
