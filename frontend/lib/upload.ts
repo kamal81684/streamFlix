@@ -12,9 +12,26 @@ import {
 // S3 multipart parts must be >= 5 MiB (except the final part). 10 MiB is a
 // safe default that keeps the part count well under the 10,000 limit.
 const CHUNK_SIZE = 10 * 1024 * 1024;
-const CONCURRENCY = 4;
+const CONCURRENCY = 3;
 
 type ProgressFn = (percent: number) => void;
+
+/**
+ * Wrap a progress callback so it only fires when the whole-number percent
+ * changes. XHR upload events fire hundreds of times per chunk; without this,
+ * parallel chunks flood React with thousands of setState calls per second,
+ * saturating the main thread and crashing the tab.
+ */
+function throttleProgress(onProgress?: ProgressFn): ProgressFn {
+  let last = -1;
+  return (percent: number) => {
+    const p = Math.max(0, Math.min(100, Math.round(percent)));
+    if (p !== last) {
+      last = p;
+      onProgress?.(p);
+    }
+  };
+}
 
 /**
  * Thumbnail: single presigned PUT straight to S3, then confirm to the backend.
@@ -25,15 +42,14 @@ export async function uploadThumbnailDirect(
   file: File,
   onProgress?: ProgressFn
 ) {
+  const report = throttleProgress(onProgress);
   const { data } = await presignThumbnail(movieId, file.name, file.type);
 
   await axios.put(data.url, file, {
     // The URL was signed with this Content-Type, so it must be sent back.
     headers: { "Content-Type": file.type },
     onUploadProgress: (e) => {
-      if (onProgress && e.total) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
+      if (e.total) report((e.loaded / e.total) * 100);
     },
   });
 
@@ -51,7 +67,9 @@ export async function uploadVideoDirect(
   file: File,
   onProgress?: ProgressFn
 ) {
-  const partCount = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+  const size = file.size;
+  const partCount = Math.max(1, Math.ceil(size / CHUNK_SIZE));
+  const report = throttleProgress(onProgress);
 
   const { data } = await initiateVideoUpload(
     movieId,
@@ -69,10 +87,11 @@ export async function uploadVideoDirect(
   const completed = new Array<CompletedPart>(partCount);
 
   const reportProgress = () => {
-    if (!onProgress) return;
-    const total = loaded.reduce((a, b) => a + b, 0);
+    if (!size) return;
+    let total = 0;
+    for (let j = 0; j < loaded.length; j++) total += loaded[j];
     // Cap at 99% until the backend confirms completion.
-    onProgress(Math.min(99, Math.round((total / file.size) * 100)));
+    report(Math.min(99, (total / size) * 100));
   };
 
   try {
@@ -82,9 +101,11 @@ export async function uploadVideoDirect(
         const i = cursor++;
         const { partNumber, url } = parts[i];
         const start = (partNumber - 1) * CHUNK_SIZE;
-        const blob = file.slice(start, Math.min(start + CHUNK_SIZE, file.size));
+        const blob = file.slice(start, Math.min(start + CHUNK_SIZE, size));
 
         const resp = await axios.put(url, blob, {
+          // Bounded, streamed straight from disk by the browser; the throttled
+          // reporter keeps the progress events from flooding React.
           onUploadProgress: (e) => {
             loaded[i] = e.loaded;
             reportProgress();
