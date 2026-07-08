@@ -31,6 +31,35 @@ import validate from "../middleware/validate.middleware.js";
 
 // Public routes (must be before /:id)
 router.get(
+    "/featured",
+    getFeaturedMovie
+);
+
+router.get(
+    "/latest",
+    getLatestMovies
+);
+
+router.get(
+    "/genres",
+    getGenres
+);
+
+router.get(
+    "/continue",
+    authenticate,
+    getContinueWatching
+);
+
+router.post(
+    "/progress",
+    authenticate,
+    updateProgressValidator,
+    validate,
+    updateWatchProgress
+);
+
+router.get(
     "/public",
     getPublicMovies
 );
@@ -101,21 +130,6 @@ router.patch(
 );
 
 router.get(
-    "/featured",
-    getFeaturedMovie
-);
-
-router.get(
-    "/latest",
-    getLatestMovies
-);
-
-router.get(
-    "/genres",
-    getGenres
-);
-
-router.get(
     "/:id/similar",
     getSimilarMovies
 );
@@ -133,17 +147,4 @@ router.get(
     streamMovie
 );
 
-router.post(
-    "/progress",
-    authenticate,
-    updateProgressValidator,
-    validate,
-    updateWatchProgress
-);
-
-router.get(
-    "/continue",
-    authenticate,
-    getContinueWatching
-);
 export default router;

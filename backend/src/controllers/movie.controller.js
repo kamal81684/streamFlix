@@ -6,6 +6,15 @@ import {
     unpublishMovieService,
     uploadMovieThumbnailService,
     getPublicMoviesService,
+    featureMovieService,
+    unfeatureMovieService,
+    getFeaturedMovieService,
+    getLatestMoviesService,
+    getGenresService,
+    getSimilarMoviesService,
+    uploadMovieVideoService,
+    streamMovieService,
+    getContinueWatchingService,
 } from "../services/movie.services.js";
 
 import ApiError from "../errors/Apierror.js";

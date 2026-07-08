@@ -65,6 +65,9 @@ export const refreshToken = async (req, res, next) => {
             accessToken: newAccessToken,
         });
     } catch (error) {
+        if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.TokenExpiredError) {
+            return next(new ApiError(401, error.message === "jwt expired" ? "Token expired" : "Invalid refresh token"));
+        }
         next(error);
     }
 };

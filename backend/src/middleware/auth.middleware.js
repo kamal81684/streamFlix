@@ -19,6 +19,9 @@ export const authenticate = async (req, res, next) => {
         req.user = await User.findById(decoded.id).select("-password");
         next();
     } catch (error) {
+        if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.TokenExpiredError) {
+            return new ApiError(401, error.message === "jwt expired" ? "Token expired" : "Invalid token");
+        }
         next(error);
     }
 };
