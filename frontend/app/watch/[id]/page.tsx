@@ -13,7 +13,9 @@ export default function WatchPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "");
+  // Full API base, e.g. http://localhost:5001/api — the stream route is
+  // mounted under /api, so we must NOT strip it.
+  const apiBase = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     if (!id) return;
@@ -51,7 +53,7 @@ export default function WatchPage() {
   // (which expires after ~1h and would 403 mid-movie or on pause/resume), this
   // never expires and doesn't depend on a freshly-signed url reaching the client.
   const videoUrl = movie.video?.key
-    ? `${apiUrl}/movies/${movie._id}/video`
+    ? `${apiBase}/movies/${movie._id}/video`
     : movie.video?.url || null;
 
   return (
