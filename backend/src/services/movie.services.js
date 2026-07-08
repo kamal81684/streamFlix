@@ -296,6 +296,37 @@ export const uploadMovieVideoService = async (
     return movie;
 }
 
+// Attach an already-uploaded (direct-to-S3) video to a movie and
+// clean up the previously stored object, if any.
+export const setMovieVideoService = async (movieId, video) => {
+    const movie = await Movie.findById(movieId);
+
+    if (!movie) {
+        throw new ApiError(404, "Movie not found");
+    }
+
+    const oldVideo = movie.video;
+
+    movie.video = {
+        key: video.key,
+        url: video.url,
+        size: video.size || 0,
+        mimeType: video.mimeType,
+        duration: 0,
+    };
+    await movie.save();
+
+    if (oldVideo?.key && oldVideo.key !== video.key) {
+        try {
+            await deleteFromS3(oldVideo.key);
+        } catch (error) {
+            console.error("Failed to delete old video:", error);
+        }
+    }
+
+    return movie;
+};
+
 export const streamMovieService = async (
     movieId,
     range

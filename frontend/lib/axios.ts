@@ -11,6 +11,13 @@ const api = axios.create({
 // Request Interceptor
 api.interceptors.request.use(
   (config) => {
+    // For multipart uploads (FormData), let the browser set
+    // `Content-Type: multipart/form-data` with the correct boundary.
+    // The instance-level JSON default would otherwise clobber it and
+    // multer would fail to parse the file (req.file === undefined -> 400).
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      config.headers.delete("Content-Type");
+    }
     return config;
   },
   (error) => Promise.reject(error)

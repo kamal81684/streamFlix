@@ -10,9 +10,8 @@ import {
   unpublishMovie,
   featureMovie,
   unfeatureMovie,
-  uploadThumbnail,
-  uploadVideo,
 } from "@/services/admin.api";
+import { uploadThumbnailDirect, uploadVideoDirect } from "@/lib/upload";
 import { Movie } from "@/types/movie.types";
 import { Button } from "@/components/ui/button";
 
@@ -20,6 +19,19 @@ export default function MovieTable() {
   const router = useRouter();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Upload progress keyed by `${movieId}:thumb` / `${movieId}:video`.
+  // A value of undefined means "no upload in progress".
+  const [progress, setProgress] = useState<Record<string, number>>({});
+
+  const setProgressFor = (uploadKey: string, value?: number) =>
+    setProgress((prev) => {
+      if (value === undefined) {
+        const next = { ...prev };
+        delete next[uploadKey];
+        return next;
+      }
+      return { ...prev, [uploadKey]: value };
+    });
 
   const fetchMovies = async () => {
     try {
@@ -68,26 +80,41 @@ export default function MovieTable() {
     }
   };
 
+  const handleUploadError = (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.data?.message) {
+      toast.error(error.response.data.message);
+    } else if (error instanceof Error) {
+      toast.error(error.message);
+    } else {
+      toast.error("Upload failed");
+    }
+  };
+
   const handleThumbnailUpload = async (id: string, file: File) => {
+    const key = `${id}:thumb`;
+    setProgressFor(key, 0);
     try {
-      await uploadThumbnail(id, file);
+      await uploadThumbnailDirect(id, file, (p) => setProgressFor(key, p));
       fetchMovies();
       toast.success("Thumbnail uploaded");
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      }
+      handleUploadError(error);
+    } finally {
+      setProgressFor(key, undefined);
     }
   };
 
   const handleVideoUpload = async (id: string, file: File) => {
+    const key = `${id}:video`;
+    setProgressFor(key, 0);
     try {
-      await uploadVideo(id, file);
+      await uploadVideoDirect(id, file, (p) => setProgressFor(key, p));
+      fetchMovies();
       toast.success("Video uploaded");
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      }
+      handleUploadError(error);
+    } finally {
+      setProgressFor(key, undefined);
     }
   };
 
@@ -144,32 +171,46 @@ export default function MovieTable() {
                 </Button>
               </td>
               <td className="py-2 pr-4">
-                <label className="cursor-pointer text-primary hover:underline text-xs">
-                  Upload
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleThumbnailUpload(movie._id, file);
-                    }}
-                  />
-                </label>
+                {progress[`${movie._id}:thumb`] !== undefined ? (
+                  <span className="text-xs text-muted-foreground">
+                    {progress[`${movie._id}:thumb`]}%
+                  </span>
+                ) : (
+                  <label className="cursor-pointer text-primary hover:underline text-xs">
+                    {movie.thumbnail?.url ? "Replace" : "Upload"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleThumbnailUpload(movie._id, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
               </td>
               <td className="py-2 pr-4">
-                <label className="cursor-pointer text-primary hover:underline text-xs">
-                  Upload
-                  <input
-                    type="file"
-                    accept="video/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleVideoUpload(movie._id, file);
-                    }}
-                  />
-                </label>
+                {progress[`${movie._id}:video`] !== undefined ? (
+                  <span className="text-xs text-muted-foreground">
+                    {progress[`${movie._id}:video`]}%
+                  </span>
+                ) : (
+                  <label className="cursor-pointer text-primary hover:underline text-xs">
+                    {movie.video?.url ? "Replace" : "Upload"}
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleVideoUpload(movie._id, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
               </td>
               <td className="py-2 pr-4">
                 <Button

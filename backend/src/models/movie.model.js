@@ -111,14 +111,13 @@ const movieSchema = new mongoose.Schema({
     {timestamps: true,}
 );
 
-movieSchema.pre("save", function (next) {
+movieSchema.pre("save", function () {
     if (this.title && !this.slug) {
         this.slug = this.title
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-+|-+$/g, "");
     }
-    next();
 });
 
 export default mongoose.model(

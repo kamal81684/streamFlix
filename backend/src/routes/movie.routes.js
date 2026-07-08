@@ -20,6 +20,11 @@ import {
     streamMovie,
     updateWatchProgress,
     getContinueWatching,
+    getThumbnailUploadUrl,
+    confirmThumbnailUpload,
+    initiateVideoUpload,
+    completeVideoUpload,
+    abortVideoUpload,
 } from "../controllers/movie.controller.js";
 
 import { createMovieValidation } from "../validators/movie.validator.js";
@@ -113,6 +118,42 @@ router.patch(
     authorize("admin"),
     uploadThumbnail.single("thumbnail"),
     uploadMovieThumbnail
+);
+
+// Presigned / direct-to-S3 upload flow (admin)
+router.post(
+    "/:id/thumbnail/presign",
+    authenticate,
+    authorize("admin"),
+    getThumbnailUploadUrl
+);
+
+router.post(
+    "/:id/thumbnail/confirm",
+    authenticate,
+    authorize("admin"),
+    confirmThumbnailUpload
+);
+
+router.post(
+    "/:id/video/initiate",
+    authenticate,
+    authorize("admin"),
+    initiateVideoUpload
+);
+
+router.post(
+    "/:id/video/complete",
+    authenticate,
+    authorize("admin"),
+    completeVideoUpload
+);
+
+router.post(
+    "/:id/video/abort",
+    authenticate,
+    authorize("admin"),
+    abortVideoUpload
 );
 
 router.patch(

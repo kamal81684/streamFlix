@@ -13,12 +13,22 @@ import {
     getGenresService,
     getSimilarMoviesService,
     uploadMovieVideoService,
+    setMovieVideoService,
     streamMovieService,
     getContinueWatchingService,
 } from "../services/movie.services.js";
 
 import ApiError from "../errors/Apierror.js";
-import { uploadToS3 } from "../utils/s3.js";
+import {
+    uploadToS3,
+    getPresignedPutUrl,
+    publicUrlForKey,
+    createMultipartUpload,
+    getMultipartPartUrls,
+    completeMultipartUpload,
+    abortMultipartUpload,
+} from "../utils/s3.js";
+import { signMovieMedia, signMoviesMedia } from "../utils/signMovie.js";
 
 
 export const createMovie = async (req, res, next) => {
@@ -50,8 +60,9 @@ export const getAllMovies = async (
 ) => {
     try {
 
-        const movies =
-            await getAllMoviesServices();
+        const movies = await signMoviesMedia(
+            await getAllMoviesServices()
+        );
 
         return res.status(200).json({
             success: true,
@@ -74,7 +85,7 @@ export const getMovieById = async (req, res, next) => {
 
         return res.status(200).json({
             success: true,
-            movie,
+            movie: await signMovieMedia(movie),
         });
     } catch (error) {
         next(error);
@@ -170,7 +181,7 @@ export const getPublicMovieById = async (req, res, next) => {
 
         return res.status(200).json({
             success: true,
-            movie,
+            movie: await signMovieMedia(movie),
         });
     } catch (error) {
         next(error);
@@ -188,6 +199,8 @@ export const getPublicMovies = async (
             await getPublicMoviesService(
                 req.query
             );
+
+        result.movies = await signMoviesMedia(result.movies);
 
         return res.status(200).json({
             success: true,
@@ -238,7 +251,7 @@ export const getFeaturedMovie = async (req, res, next) => {
 
         return res.status(200).json({
             success: true,
-            movie,
+            movie: await signMovieMedia(movie),
         });
 
     } catch (error) {
@@ -254,8 +267,9 @@ export const getLatestMovies = async (
 
     try {
 
-        const movies =
-            await getLatestMoviesService();
+        const movies = await signMoviesMedia(
+            await getLatestMoviesService()
+        );
 
         return res.status(200).json({
             success: true,
@@ -296,10 +310,11 @@ export const getSimilarMovies = async (
 
     try {
 
-        const movies =
+        const movies = await signMoviesMedia(
             await getSimilarMoviesService(
                 req.params.id
-            );
+            )
+        );
 
         return res.status(200).json({
             success: true,
@@ -344,6 +359,142 @@ export const uploadMovieVideo = async (
         next(error);
     }
 
+};
+
+// ---- Presigned / direct-to-S3 upload flow ----
+
+const MAX_PARTS = 10000; // S3 hard limit
+
+// 1a. Thumbnail: hand back a single presigned PUT URL.
+export const getThumbnailUploadUrl = async (req, res, next) => {
+    try {
+        const { fileName, fileType } = req.body;
+
+        if (!fileType || !fileType.startsWith("image/")) {
+            throw new ApiError(400, "Only image files are allowed");
+        }
+
+        // Ensure the movie exists before minting an upload URL.
+        await getMovieByIdService(req.params.id);
+
+        const { key, url } = await getPresignedPutUrl(
+            fileName || "thumbnail",
+            fileType,
+            "thumbnails"
+        );
+
+        return res.status(200).json({ success: true, key, url });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 1b. Thumbnail: persist the uploaded object onto the movie.
+export const confirmThumbnailUpload = async (req, res, next) => {
+    try {
+        const { key } = req.body;
+
+        if (!key) {
+            throw new ApiError(400, "key is required");
+        }
+
+        const movie = await uploadMovieThumbnailService(req.params.id, {
+            key,
+            url: publicUrlForKey(key),
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Thumbnail uploaded successfully",
+            movie,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 2a. Video: start a multipart upload and return presigned part URLs.
+export const initiateVideoUpload = async (req, res, next) => {
+    try {
+        const { fileName, fileType, partCount } = req.body;
+
+        if (!fileType || !fileType.startsWith("video/")) {
+            throw new ApiError(400, "Only video files are allowed");
+        }
+
+        const parts = Number(partCount);
+        if (!Number.isInteger(parts) || parts < 1 || parts > MAX_PARTS) {
+            throw new ApiError(400, `partCount must be between 1 and ${MAX_PARTS}`);
+        }
+
+        await getMovieByIdService(req.params.id);
+
+        const { key, uploadId } = await createMultipartUpload(
+            fileName || "video",
+            fileType,
+            "videos"
+        );
+
+        const urls = await getMultipartPartUrls(key, uploadId, parts);
+
+        return res.status(200).json({ success: true, key, uploadId, parts: urls });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 2b. Video: finalize the multipart upload and attach it to the movie.
+export const completeVideoUpload = async (req, res, next) => {
+    try {
+        const { key, uploadId, parts, size, mimeType } = req.body;
+
+        if (!key || !uploadId || !Array.isArray(parts) || parts.length === 0) {
+            throw new ApiError(400, "key, uploadId and parts are required");
+        }
+
+        const normalized = parts.map((p) => ({
+            ETag: p.ETag ?? p.etag,
+            PartNumber: Number(p.PartNumber ?? p.partNumber),
+        }));
+
+        if (normalized.some((p) => !p.ETag || !Number.isInteger(p.PartNumber))) {
+            throw new ApiError(400, "Each part needs an ETag and PartNumber");
+        }
+
+        const { url } = await completeMultipartUpload(key, uploadId, normalized);
+
+        const movie = await setMovieVideoService(req.params.id, {
+            key,
+            url,
+            size,
+            mimeType,
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Video uploaded successfully",
+            movie,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 2c. Video: abort a multipart upload (cleanup on client failure/cancel).
+export const abortVideoUpload = async (req, res, next) => {
+    try {
+        const { key, uploadId } = req.body;
+
+        if (!key || !uploadId) {
+            throw new ApiError(400, "key and uploadId are required");
+        }
+
+        await abortMultipartUpload(key, uploadId);
+
+        return res.status(200).json({ success: true, message: "Upload aborted" });
+    } catch (error) {
+        next(error);
+    }
 };
 
 export const streamMovie = async (
@@ -414,10 +565,17 @@ export const getContinueWatching = async (
 
     try {
 
-        const movies =
+        const history =
             await getContinueWatchingService(
                 req.user._id
             );
+
+        const movies = await Promise.all(
+            history.map(async (item) => ({
+                ...item,
+                movie: await signMovieMedia(item.movie),
+            }))
+        );
 
         return res.status(200).json({
             success: true,
