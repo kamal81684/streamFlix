@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import axios from "axios";
@@ -14,6 +14,74 @@ import {
 import { uploadThumbnailDirect, uploadVideoDirect } from "@/lib/upload";
 import { Movie } from "@/types/movie.types";
 import { Button } from "@/components/ui/button";
+
+// A clickable preview tile that doubles as the upload / replace control.
+function MediaCell({
+  kind,
+  accept,
+  hasMedia,
+  progress,
+  preview,
+  onFile,
+}: {
+  kind: string;
+  accept: string;
+  hasMedia: boolean;
+  progress?: number;
+  preview: ReactNode;
+  onFile: (file: File) => void;
+}) {
+  const uploading = progress !== undefined;
+
+  return (
+    <label
+      title={hasMedia ? `Replace ${kind}` : `Upload ${kind}`}
+      className={`group relative flex h-14 w-24 items-center justify-center overflow-hidden rounded-md border bg-muted ${
+        uploading ? "cursor-default" : "cursor-pointer"
+      } ${hasMedia ? "border-border" : "border-dashed border-input"}`}
+    >
+      {hasMedia ? (
+        preview
+      ) : (
+        <span className="text-[10px] font-medium text-muted-foreground">
+          + {kind}
+        </span>
+      )}
+
+      {!uploading && (
+        <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+          {hasMedia ? "Replace" : "Upload"}
+        </span>
+      )}
+
+      {uploading && (
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/70">
+          <span className="text-[10px] font-semibold text-white">
+            {progress}%
+          </span>
+          <span className="h-1 w-16 overflow-hidden rounded-full bg-white/25">
+            <span
+              className="block h-full rounded-full bg-white transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </span>
+        </span>
+      )}
+
+      <input
+        type="file"
+        accept={accept}
+        className="hidden"
+        disabled={uploading}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(file);
+          e.target.value = "";
+        }}
+      />
+    </label>
+  );
+}
 
 export default function MovieTable() {
   const router = useRouter();
@@ -135,24 +203,29 @@ export default function MovieTable() {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full border-separate border-spacing-0 text-sm">
         <thead>
-          <tr className="border-b text-left text-muted-foreground">
-            <th className="py-2 pr-4">Title</th>
-            <th className="py-2 pr-4">Year</th>
-            <th className="py-2 pr-4">Published</th>
-            <th className="py-2 pr-4">Featured</th>
-            <th className="py-2 pr-4">Thumbnail</th>
-            <th className="py-2 pr-4">Video</th>
-            <th className="py-2 pr-4">Actions</th>
+          <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+            <th className="border-b py-2 pr-4 font-medium">Title</th>
+            <th className="border-b py-2 pr-4 font-medium">Year</th>
+            <th className="border-b py-2 pr-4 font-medium">Published</th>
+            <th className="border-b py-2 pr-4 font-medium">Featured</th>
+            <th className="border-b py-2 pr-4 font-medium">Thumbnail</th>
+            <th className="border-b py-2 pr-4 font-medium">Video</th>
+            <th className="border-b py-2 pr-4 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
           {movies.map((movie) => (
-            <tr key={movie._id} className="border-b">
-              <td className="py-2 pr-4 font-medium">{movie.title}</td>
-              <td className="py-2 pr-4">{movie.releaseYear}</td>
-              <td className="py-2 pr-4">
+            <tr
+              key={movie._id}
+              className="align-middle transition-colors hover:bg-muted/40"
+            >
+              <td className="border-b py-3 pr-4 font-medium">{movie.title}</td>
+              <td className="border-b py-3 pr-4 text-muted-foreground">
+                {movie.releaseYear}
+              </td>
+              <td className="border-b py-3 pr-4">
                 <Button
                   size="xs"
                   variant={movie.isPublished ? "default" : "outline"}
@@ -161,7 +234,7 @@ export default function MovieTable() {
                   {movie.isPublished ? "Published" : "Draft"}
                 </Button>
               </td>
-              <td className="py-2 pr-4">
+              <td className="border-b py-3 pr-4">
                 <Button
                   size="xs"
                   variant={movie.isFeatured ? "default" : "outline"}
@@ -170,49 +243,50 @@ export default function MovieTable() {
                   {movie.isFeatured ? "Featured" : "Not Featured"}
                 </Button>
               </td>
-              <td className="py-2 pr-4">
-                {progress[`${movie._id}:thumb`] !== undefined ? (
-                  <span className="text-xs text-muted-foreground">
-                    {progress[`${movie._id}:thumb`]}%
-                  </span>
-                ) : (
-                  <label className="cursor-pointer text-primary hover:underline text-xs">
-                    {movie.thumbnail?.url ? "Replace" : "Upload"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleThumbnailUpload(movie._id, file);
-                        e.target.value = "";
-                      }}
+              <td className="border-b py-3 pr-4">
+                <MediaCell
+                  kind="image"
+                  accept="image/*"
+                  hasMedia={!!movie.thumbnail?.url}
+                  progress={progress[`${movie._id}:thumb`]}
+                  onFile={(file) => handleThumbnailUpload(movie._id, file)}
+                  preview={
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={movie.thumbnail?.url}
+                      alt={movie.title}
+                      className="h-full w-full object-cover"
                     />
-                  </label>
-                )}
+                  }
+                />
               </td>
-              <td className="py-2 pr-4">
-                {progress[`${movie._id}:video`] !== undefined ? (
-                  <span className="text-xs text-muted-foreground">
-                    {progress[`${movie._id}:video`]}%
-                  </span>
-                ) : (
-                  <label className="cursor-pointer text-primary hover:underline text-xs">
-                    {movie.video?.url ? "Replace" : "Upload"}
-                    <input
-                      type="file"
-                      accept="video/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleVideoUpload(movie._id, file);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                )}
+              <td className="border-b py-3 pr-4">
+                <MediaCell
+                  kind="video"
+                  accept="video/*"
+                  hasMedia={!!movie.video?.url}
+                  progress={progress[`${movie._id}:video`]}
+                  onFile={(file) => handleVideoUpload(movie._id, file)}
+                  preview={
+                    <span className="relative block h-full w-full">
+                      <video
+                        src={movie.video?.url}
+                        poster={movie.thumbnail?.url}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="h-full w-full bg-black object-cover"
+                      />
+                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black/60 pl-0.5 text-[8px] text-white">
+                          ▶
+                        </span>
+                      </span>
+                    </span>
+                  }
+                />
               </td>
-              <td className="py-2 pr-4">
+              <td className="border-b py-3 pr-4">
                 <Button
                   size="xs"
                   variant="outline"
