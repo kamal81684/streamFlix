@@ -47,11 +47,12 @@ export default function WatchPage() {
     );
   }
 
-  const videoUrl =
-    movie.video?.url ||
-    (movie.video?.key
-      ? `${apiUrl}/movies/${movie._id}/video`
-      : null);
+  // Stream through the backend proxy for playback. Unlike a presigned S3 URL
+  // (which expires after ~1h and would 403 mid-movie or on pause/resume), this
+  // never expires and doesn't depend on a freshly-signed url reaching the client.
+  const videoUrl = movie.video?.key
+    ? `${apiUrl}/movies/${movie._id}/video`
+    : movie.video?.url || null;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">

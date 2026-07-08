@@ -505,15 +505,9 @@ export const streamMovie = async (
 
     try {
 
-        const range =
-            req.headers.range;
-
-        if (!range) {
-            throw new ApiError(
-                400,
-                "Range header is required."
-            );
-        }
+        // Default to the start of the file when no Range header is sent, so
+        // clients that don't request a range still get playable bytes.
+        const range = req.headers.range || "bytes=0-";
 
         const video =
             await streamMovieService(
